@@ -1,0 +1,437 @@
+const { RELATIONSHIP_TYPES } = require('../utils/Constants');
+const logger = require('../utils/logger');
+const { AppError } = require('../utils/errorHandler');
+
+/**
+ * Manages relationships between entities in the game world.
+ * Tracks relationship types, strengths, and histories between entities.
+ * 
+ * @class RelationshipGraph
+ * @example
+ * const graph = new RelationshipGraph();
+ * graph.setRelationship('npc1', 'npc2', { type: 'friendship', strength: 70 });
+ */
+class RelationshipGraph {
+    /**
+     * Creates a new RelationshipGraph instance.
+     * Initializes data structures for tracking relationships and their history.
+     * 
+     * @constructor
+     */
+    constructor() {
+        try {
+            logger.info('Initializing RelationshipGraph...');
+            
+            // Maps entityId -> Map(targetEntityId -> relationship)
+            this.relationships = new Map();
+            
+            // Tracks player's standing with other entities
+            this.playerStandings = new Map();
+            
+            // Complete history of all relationship changes
+            this.relationshipHistory = [];
+            
+            logger.info('RelationshipGraph initialized successfully');
+        } catch (error) {
+            const errorMsg = `Failed to initialize RelationshipGraph: ${error.message}`;
+            logger.error(errorMsg, { error });
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Establishes or updates a relationship between two entities.
+     * 
+     * @param {string} entity1Id - The ID of the first entity
+     * @param {string} entity2Id - The ID of the second entity
+     * @param {Object} relationshipData - The relationship data
+     * @param {string} relationshipData.type - The type of relationship (from RELATIONSHIP_TYPES)
+     * @param {number} relationshipData.strength - The strength of the relationship (0-100)
+     * @param {string} [relationshipData.reason] - The reason for the relationship
+     * @param {string} [relationshipData.established] - When the relationship was established (ISO string)
+     * @returns {Object} The created/updated relationship
+     * @throws {AppError} If the relationship data is invalid
+     */
+    setRelationship(entity1Id, entity2Id, relationshipData = {}) {
+        try {
+            // Input validation
+            if (typeof entity1Id !== 'string' || !entity1Id.trim()) {
+                throw new AppError('entity1Id must be a non-empty string', 400);
+            }
+            
+            if (typeof entity2Id !== 'string' || !entity2Id.trim()) {
+                throw new AppError('entity2Id must be a non-empty string', 400);
+            }
+            
+            if (entity1Id === entity2Id) {
+                throw new AppError('Cannot create a relationship between an entity and itself', 400);
+            }
+            
+            const { type = 'neutral', strength = 50, reason = '', established } = relationshipData;
+            
+            // Validate relationship type
+            if (!Object.values(RELATIONSHIP_TYPES).includes(type)) {
+                throw new AppError(
+                    `Invalid relationship type: ${type}. Must be one of: ${Object.values(RELATIONSHIP_TYPES).join(', ')}`,
+                    400
+                );
+            }
+            
+            // Validate strength
+            if (typeof strength !== 'number' || strength < 0 || strength > 100) {
+                throw new AppError('Relationship strength must be a number between 0 and 100', 400);
+            }
+            
+            logger.debug(`Setting relationship between ${entity1Id} and ${entity2Id}`, {
+                type,
+                strength,
+                reason
+            });
+            
+            // Initialize entity1's relationship map if it doesn't exist
+            if (!this.relationships.has(entity1Id)) {
+                this.relationships.set(entity1Id, new Map());
+            }
+            
+            // Create or update the relationship
+            const now = new Date().toISOString();
+            const relationship = {
+                type,
+                strength: Math.max(0, Math.min(100, strength)), // Clamp to 0-100
+                reason: String(reason || ''),
+                established: established || now,
+                lastModified: now,
+                history: []
+            };
+            
+            // If this is an update, preserve the existing history
+            const existingRelationship = this.relationships.get(entity1Id).get(entity2Id);
+            if (existingRelationship && existingRelationship.history) {
+                relationship.history = [...existingRelationship.history];
+            }
+            
+            // Add current state to history
+            relationship.history.push({
+                timestamp: now,
+                type,
+                strength,
+                reason: reason || 'Relationship updated'
+            });
+            
+            // Store the relationship (both directions for easy lookup)
+            this.relationships.get(entity1Id).set(entity2Id, relationship);
+            
+            // Ensure the reverse relationship exists for the other entity
+            if (!this.relationships.has(entity2Id)) {
+                this.relationships.set(entity2Id, new Map());
+            }
+            
+            // Record in history
+            this.relationshipHistory.push({
+                entity1: entity1Id,
+                entity2: entity2Id,
+                action: existingRelationship ? 'updated' : 'established',
+                relationship: { ...relationship },
+                timestamp: now
+            });
+            
+            // Trim history if it gets too large
+            if (this.relationshipHistory.length > 1000) {
+                this.relationshipHistory = this.relationshipHistory.slice(-1000);
+            }
+            
+            logger.info(`${existingRelationship ? 'Updated' : 'Established'} relationship between ${entity1Id} and ${entity2Id}`, {
+                type,
+                strength
+            });
+            
+            return relationship;
+            
+        } catch (error) {
+            const errorMsg = `Failed to set relationship between ${entity1Id} and ${entity2Id}: ${error.message}`;
+            logger.error(errorMsg, { error, entity1Id, entity2Id, relationshipData });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Updates an existing relationship between two entities.
+     * 
+     * @param {string} entity1Id - The ID of the first entity
+     * @param {string} entity2Id - The ID of the second entity
+     * @param {Object} changes - The changes to apply to the relationship
+     * @returns {Object} The updated relationship
+     * @throws {AppError} If the relationship doesn't exist or the changes are invalid
+     */
+    updateRelationship(entity1Id, entity2Id, changes) {
+        try {
+            if (!this.relationships.has(entity1Id) || !this.relationships.get(entity1Id).has(entity2Id)) {
+                throw new AppError(
+                    `Relationship between ${entity1Id} and ${entity2Id} does not exist`,
+                    404
+                );
+            }
+            
+            logger.debug(`Updating relationship between ${entity1Id} and ${entity2Id}`, { changes });
+            
+            // Get the existing relationship
+            const relationship = this.relationships.get(entity1Id).get(entity2Id);
+            const oldRelationship = { ...relationship };
+            
+            // Apply changes
+            Object.assign(relationship, changes, {
+                lastModified: new Date().toISOString()
+            });
+            
+            // Add to history
+            relationship.history.push({
+                timestamp: new Date().toISOString(),
+                changes,
+                reason: changes.reason || 'Relationship updated'
+            });
+            
+            // Record in history
+            this.relationshipHistory.push({
+                entity1: entity1Id,
+                entity2: entity2Id,
+                action: 'updated',
+                changes,
+                oldState: oldRelationship,
+                newState: { ...relationship },
+                timestamp: new Date().toISOString()
+            });
+            
+            logger.info(`Updated relationship between ${entity1Id} and ${entity2Id}`, {
+                changes,
+                newStrength: relationship.strength,
+                newType: relationship.type
+            });
+            
+            return relationship;
+            
+        } catch (error) {
+            const errorMsg = `Failed to update relationship between ${entity1Id} and ${entity2Id}: ${error.message}`;
+            logger.error(errorMsg, { error, entity1Id, entity2Id, changes });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Gets the relationship between two entities.
+     * 
+     * @param {string} entity1Id - The ID of the first entity
+     * @param {string} entity2Id - The ID of the second entity
+     * @returns {Object|null} The relationship, or null if it doesn't exist
+     */
+    getRelationship(entity1Id, entity2Id) {
+        try {
+            if (!this.relationships.has(entity1Id) || !this.relationships.get(entity1Id).has(entity2Id)) {
+                return null;
+            }
+            
+            return { ...this.relationships.get(entity1Id).get(entity2Id) };
+            
+        } catch (error) {
+            const errorMsg = `Failed to get relationship between ${entity1Id} and ${entity2Id}: ${error.message}`;
+            logger.error(errorMsg, { error, entity1Id, entity2Id });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Gets all relationships for a specific entity.
+     * 
+     * @param {string} entityId - The ID of the entity
+     * @returns {Object} An object mapping entity IDs to their relationships with the specified entity
+     */
+    getEntityRelationships(entityId) {
+        try {
+            const result = {};
+            
+            // Get relationships where entityId is the source
+            if (this.relationships.has(entityId)) {
+                for (const [targetId, relationship] of this.relationships.get(entityId).entries()) {
+                    result[targetId] = { ...relationship };
+                }
+            }
+            
+            // Get relationships where entityId is the target
+            for (const [sourceId, targets] of this.relationships.entries()) {
+                if (targets.has(entityId)) {
+                    result[sourceId] = { ...targets.get(entityId) };
+                }
+            }
+            
+            return result;
+            
+        } catch (error) {
+            const errorMsg = `Failed to get relationships for entity ${entityId}: ${error.message}`;
+            logger.error(errorMsg, { error, entityId });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Gets the relationship history between two entities.
+     * 
+     * @param {string} entity1Id - The ID of the first entity
+     * @param {string} [entity2Id] - Optional ID of the second entity
+     * @returns {Array} An array of historical relationship changes
+     */
+    getRelationshipHistory(entity1Id, entity2Id) {
+        try {
+            if (!entity2Id) {
+                // Return all history involving entity1Id
+                return this.relationshipHistory.filter(
+                    entry => entry.entity1 === entity1Id || entry.entity2 === entity1Id
+                );
+            }
+            
+            // Return history between the two specific entities
+            return this.relationshipHistory.filter(
+                entry => 
+                    (entry.entity1 === entity1Id && entry.entity2 === entity2Id) ||
+                    (entry.entity1 === entity2Id && entry.entity2 === entity1Id)
+            );
+            
+        } catch (error) {
+            const target = entity2Id ? `${entity1Id} and ${entity2Id}` : entity1Id;
+            const errorMsg = `Failed to get relationship history for ${target}: ${error.message}`;
+            logger.error(errorMsg, { error, entity1Id, entity2Id });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Removes a relationship between two entities.
+     * 
+     * @param {string} entity1Id - The ID of the first entity
+     * @param {string} entity2Id - The ID of the second entity
+     * @returns {boolean} True if the relationship was removed, false if it didn't exist
+     */
+    removeRelationship(entity1Id, entity2Id) {
+        try {
+            let removed = false;
+            
+            // Remove relationship in both directions
+            if (this.relationships.has(entity1Id) && this.relationships.get(entity1Id).has(entity2Id)) {
+                const relationship = this.relationships.get(entity1Id).get(entity2Id);
+                this.relationships.get(entity1Id).delete(entity2Id);
+                
+                // Record in history
+                this.relationshipHistory.push({
+                    entity1: entity1Id,
+                    entity2: entity2Id,
+                    action: 'removed',
+                    relationship,
+                    timestamp: new Date().toISOString()
+                });
+                
+                removed = true;
+            }
+            
+            // Also clean up the reverse relationship if it exists
+            if (this.relationships.has(entity2Id) && this.relationships.get(entity2Id).has(entity1Id)) {
+                this.relationships.get(entity2Id).delete(entity1Id);
+                removed = true;
+            }
+            
+            if (removed) {
+                logger.info(`Removed relationship between ${entity1Id} and ${entity2Id}`);
+            } else {
+                logger.debug(`No relationship to remove between ${entity1Id} and ${entity2Id}`);
+            }
+            
+            return removed;
+            
+        } catch (error) {
+            const errorMsg = `Failed to remove relationship between ${entity1Id} and ${entity2Id}: ${error.message}`;
+            logger.error(errorMsg, { error, entity1Id, entity2Id });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Gets a summary of all relationships in the graph.
+     * 
+     * @returns {Object} A summary of the relationship graph
+     */
+    getSummary() {
+        try {
+            const summary = {
+                totalRelationships: 0,
+                relationshipTypes: {},
+                strongestRelationships: [],
+                weakestRelationships: [],
+                recentChanges: this.relationshipHistory.slice(-10).reverse()
+            };
+            
+            // Count relationship types and find strongest/weakest
+            const allRelationships = [];
+            
+            for (const [sourceId, targets] of this.relationships.entries()) {
+                for (const [targetId, rel] of targets.entries()) {
+                    // Only count each relationship once (avoid double-counting bidirectional)
+                    if (sourceId < targetId) {
+                        summary.totalRelationships++;
+                        
+                        // Count by type
+                        summary.relationshipTypes[rel.type] = (summary.relationshipTypes[rel.type] || 0) + 1;
+                        
+                        // Track for strongest/weakest
+                        allRelationships.push({
+                            entities: [sourceId, targetId],
+                            type: rel.type,
+                            strength: rel.strength,
+                            lastModified: rel.lastModified
+                        });
+                    }
+                }
+            }
+            
+            // Sort by strength
+            allRelationships.sort((a, b) => b.strength - a.strength);
+            
+            // Get top 5 strongest and weakest
+            summary.strongestRelationships = allRelationships.slice(0, 5);
+            summary.weakestRelationships = [...allRelationships].reverse().slice(0, 5);
+            
+            return summary;
+            
+        } catch (error) {
+            const errorMsg = `Failed to generate relationship graph summary: ${error.message}`;
+            logger.error(errorMsg, { error });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+}
+
+module.exports = RelationshipGraph;

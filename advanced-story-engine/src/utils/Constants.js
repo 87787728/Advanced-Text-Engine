@@ -71,7 +71,13 @@ module.exports = {
         GLOBAL_TENSION: { min: 0, max: 100, default: 30 },
         POLITICAL_STABILITY: { min: 0, max: 100, default: 80 },
         ECONOMIC_STATE: { min: 0, max: 100, default: 50 },
-        MAGICAL_ACTIVITY: { min: 0, max: 100, default: 20 }
+        MAGICAL_ACTIVITY: { min: 0, max: 100, default: 20 },
+        TECHNOLOGY_LEVEL: { min: 0, max: 100, default: 40 },
+        RELIGIOUS_ZEAL: { min: 0, max: 100, default: 50 },
+        CRIME_RATE: { min: 0, max: 100, default: 30 },
+        NATURAL_DISASTER_RISK: { min: 0, max: 100, default: 10 },
+        MONSTER_ACTIVITY: { min: 0, max: 100, default: 20 },
+        CULTURAL_UNITY: { min: 0, max: 100, default: 70 }
     },
     
     PLAYER_SKILLS: {

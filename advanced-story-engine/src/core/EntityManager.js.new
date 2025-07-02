@@ -1,0 +1,285 @@
+const { NPC, Faction, Location, Item, GameEvent } = require('../utils/DataStructures');
+const { ENTITY_TYPES, VALIDATION_RULES } = require('../utils/Constants');
+const logger = require('../utils/logger');
+const { AppError } = require('../utils/errorHandler');
+
+/**
+ * Manages all game entities including NPCs, factions, locations, items, and events.
+ * Provides CRUD operations and maintains entity relationships.
+ * 
+ * @class EntityManager
+ * @example
+ * const entityManager = new EntityManager();
+ * const npc = entityManager.createEntity(ENTITY_TYPES.NPC, 'npc1', { name: 'John' });
+ */
+class EntityManager {
+    /**
+     * Creates a new EntityManager instance.
+     * Initializes empty collections for each entity type.
+     * 
+     * @constructor
+     */
+    constructor() {
+        try {
+            logger.info('Initializing EntityManager...');
+            
+            // Initialize entity collections
+            this.entities = {
+                [ENTITY_TYPES.NPC]: {},
+                [ENTITY_TYPES.FACTION]: {},
+                [ENTITY_TYPES.LOCATION]: {},
+                [ENTITY_TYPES.ITEM]: {},
+                [ENTITY_TYPES.EVENT]: {}
+            };
+            
+            // Track creation history for each entity type
+            this.creationHistory = {
+                [ENTITY_TYPES.NPC]: [],
+                [ENTITY_TYPES.FACTION]: [],
+                [ENTITY_TYPES.LOCATION]: [],
+                [ENTITY_TYPES.ITEM]: [],
+                [ENTITY_TYPES.EVENT]: []
+            };
+            
+            logger.info('EntityManager initialized successfully');
+        } catch (error) {
+            const errorMsg = `Failed to initialize EntityManager: ${error.message}`;
+            logger.error(errorMsg, { error });
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Creates a new entity of the specified type.
+     * 
+     * @param {string} type - The type of entity to create (from ENTITY_TYPES)
+     * @param {string} id - Unique identifier for the entity
+     * @param {Object} data - Entity data
+     * @returns {Object} The created entity
+     * @throws {AppError} If entity creation fails
+     * @example
+     * const npc = entityManager.createEntity(ENTITY_TYPES.NPC, 'npc1', {
+     *   name: 'John',
+     *   description: 'A friendly villager'
+     * });
+     */
+    createEntity(type, id, data = {}) {
+        try {
+            // Input validation
+            if (!Object.values(ENTITY_TYPES).includes(type)) {
+                throw new AppError(`Invalid entity type: ${type}`, 400);
+            }
+            
+            if (typeof id !== 'string' || !id.trim()) {
+                throw new AppError('Entity ID must be a non-empty string', 400);
+            }
+            
+            if (this.entities[type][id]) {
+                throw new AppError(`Entity ${id} of type ${type} already exists`, 409);
+            }
+            
+            logger.debug(`Creating ${type} entity with ID: ${id}`, { data });
+            
+            // Create the appropriate entity type
+            let entity;
+            switch (type) {
+                case ENTITY_TYPES.NPC:
+                    entity = new NPC(id, data);
+                    break;
+                case ENTITY_TYPES.FACTION:
+                    entity = new Faction(id, data);
+                    break;
+                case ENTITY_TYPES.LOCATION:
+                    entity = new Location(id, data);
+                    break;
+                case ENTITY_TYPES.ITEM:
+                    entity = new Item(id, data);
+                    break;
+                case ENTITY_TYPES.EVENT:
+                    entity = new GameEvent(id, data);
+                    break;
+                default:
+                    // This should never happen due to the earlier check
+                    throw new AppError(`Unhandled entity type: ${type}`, 500);
+            }
+            
+            // Store the entity
+            this.entities[type][id] = entity;
+            
+            // Record creation
+            this.creationHistory[type].push({
+                id,
+                timestamp: new Date().toISOString(),
+                data: { ...data }
+            });
+            
+            logger.info(`Created ${type} entity: ${id}`);
+            return entity;
+            
+        } catch (error) {
+            const errorMsg = `Failed to create ${type} entity '${id}': ${error.message}`;
+            logger.error(errorMsg, { error, type, id, data });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Retrieves an entity by type and ID.
+     * 
+     * @param {string} type - The type of entity to retrieve
+     * @param {string} id - The ID of the entity
+     * @returns {Object|null} The entity, or null if not found
+     * @throws {AppError} If the entity type is invalid
+     */
+    getEntity(type, id) {
+        try {
+            if (!Object.values(ENTITY_TYPES).includes(type)) {
+                throw new AppError(`Invalid entity type: ${type}`, 400);
+            }
+            
+            const entity = this.entities[type][id] || null;
+            
+            if (!entity) {
+                logger.debug(`Entity not found: ${type}/${id}`);
+            }
+            
+            return entity;
+            
+        } catch (error) {
+            const errorMsg = `Failed to retrieve ${type} entity '${id}': ${error.message}`;
+            logger.error(errorMsg, { error, type, id });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Updates an existing entity.
+     * 
+     * @param {string} type - The type of entity to update
+     * @param {string} id - The ID of the entity
+     * @param {Object} updates - The updates to apply
+     * @returns {Object} The updated entity
+     * @throws {AppError} If the entity doesn't exist or update fails
+     */
+    updateEntity(type, id, updates) {
+        try {
+            const entity = this.getEntity(type, id);
+            if (!entity) {
+                throw new AppError(`${type} entity '${id}' not found`, 404);
+            }
+            
+            logger.debug(`Updating ${type} entity: ${id}`, { updates });
+            
+            // Apply updates
+            Object.assign(entity, updates);
+            
+            logger.info(`Updated ${type} entity: ${id}`);
+            return entity;
+            
+        } catch (error) {
+            const errorMsg = `Failed to update ${type} entity '${id}': ${error.message}`;
+            logger.error(errorMsg, { error, type, id, updates });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Deletes an entity.
+     * 
+     * @param {string} type - The type of entity to delete
+     * @param {string} id - The ID of the entity
+     * @returns {boolean} True if the entity was deleted, false if it didn't exist
+     * @throws {AppError} If the entity type is invalid
+     */
+    deleteEntity(type, id) {
+        try {
+            if (!Object.values(ENTITY_TYPES).includes(type)) {
+                throw new AppError(`Invalid entity type: ${type}`, 400);
+            }
+            
+            if (!this.entities[type][id]) {
+                logger.debug(`Cannot delete non-existent ${type} entity: ${id}`);
+                return false;
+            }
+            
+            logger.info(`Deleting ${type} entity: ${id}`);
+            delete this.entities[type][id];
+            return true;
+            
+        } catch (error) {
+            const errorMsg = `Failed to delete ${type} entity '${id}': ${error.message}`;
+            logger.error(errorMsg, { error, type, id });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Gets all entities of a specific type.
+     * 
+     * @param {string} type - The type of entities to retrieve
+     * @returns {Object} An object mapping entity IDs to entities
+     * @throws {AppError} If the entity type is invalid
+     */
+    getAllEntities(type) {
+        try {
+            if (!Object.values(ENTITY_TYPES).includes(type)) {
+                throw new AppError(`Invalid entity type: ${type}`, 400);
+            }
+            
+            return { ...this.entities[type] };
+            
+        } catch (error) {
+            const errorMsg = `Failed to retrieve all ${type} entities: ${error.message}`;
+            logger.error(errorMsg, { error, type });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Gets the creation history for a specific entity type.
+     * 
+     * @param {string} type - The type of entities to get history for
+     * @returns {Array} An array of creation records
+     * @throws {AppError} If the entity type is invalid
+     */
+    getCreationHistory(type) {
+        try {
+            if (!Object.values(ENTITY_TYPES).includes(type)) {
+                throw new AppError(`Invalid entity type: ${type}`, 400);
+            }
+            
+            return [...this.creationHistory[type]];
+            
+        } catch (error) {
+            const errorMsg = `Failed to get creation history for ${type} entities: ${error.message}`;
+            logger.error(errorMsg, { error, type });
+            
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+}
+
+module.exports = EntityManager;

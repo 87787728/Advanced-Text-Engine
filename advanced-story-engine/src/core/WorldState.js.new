@@ -1,0 +1,203 @@
+const Constants = require('../utils/Constants');
+const logger = require('../utils/logger');
+const { AppError } = require('../utils/errorHandler');
+
+/**
+ * Manages the global state of the game world, including parameters, temporal state,
+ * events, and historical records.
+ * 
+ * @class WorldState
+ * @example
+ * const worldState = new WorldState();
+ * worldState.updateGlobalParameter('GLOBAL_TENSION', 10, 'Player action');
+ */
+class WorldState {
+    /**
+     * Creates a new WorldState instance with default values.
+     * Initializes global parameters, temporal state, events, and history.
+     * 
+     * @constructor
+     * @throws {AppError} If there's an error initializing the world state
+     */
+    constructor() {
+        try {
+            logger.info('Initializing WorldState...');
+            
+            // Initialize global parameters with default values
+            this.globalParameters = {};
+            Object.entries(Constants.WORLD_PARAMETERS).forEach(([key, value]) => {
+                // Convert key to camelCase for the internal object
+                const paramName = key.toLowerCase().replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+                this.globalParameters[paramName] = value.defaultValue;
+            });
+            
+            // Initialize temporal state
+            this.time = {
+                day: 1,
+                hour: 8,
+                minute: 0,
+                dayOfWeek: 1, // 1 = Monday, 7 = Sunday
+                month: 1,
+                year: 1
+            };
+            
+            // Initialize events and history
+            this.events = [];
+            this.history = {
+                worldChanges: [],
+                playerActions: [],
+                storyEvents: []
+            };
+            
+            logger.info('WorldState initialized successfully');
+        } catch (error) {
+            const errorMsg = `Failed to initialize WorldState: ${error.message}`;
+            logger.error(errorMsg, { error });
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Updates a global parameter by applying the specified change.
+     * The value will be clamped within the parameter's defined bounds.
+     * 
+     * @param {string} parameter - The name of the parameter to update (case-insensitive)
+     * @param {number} change - The amount to add to the current value
+     * @param {string} [reason=''] - The reason for the change (for history tracking)
+     * @returns {number} The new value of the parameter
+     * @throws {AppError} If the parameter is invalid or the update fails
+     * @example
+     * // Increase tension by 10
+     * worldState.updateGlobalParameter('GLOBAL_TENSION', 10, 'Player made a difficult choice');
+     */
+    updateGlobalParameter(parameter, change, reason = '') {
+        try {
+            // Input validation
+            if (typeof parameter !== 'string' || parameter.trim() === '') {
+                throw new AppError('Parameter name must be a non-empty string', 400);
+            }
+
+            if (typeof change !== 'number' || isNaN(change)) {
+                throw new AppError('Change must be a valid number', 400);
+            }
+
+            logger.debug(`Updating global parameter: ${parameter} (change: ${change}, reason: ${reason})`);
+            
+            // Find the parameter definition (case-insensitive)
+            const paramKey = Object.keys(Constants.WORLD_PARAMETERS).find(
+                k => k.toLowerCase() === parameter.toUpperCase()
+            );
+            
+            if (!paramKey) {
+                const errorMsg = `Unknown global parameter: ${parameter}. Available parameters: ${Object.keys(Constants.WORLD_PARAMETERS).join(', ')}`;
+                logger.warn(errorMsg);
+                throw new AppError(errorMsg, 400);
+            }
+            
+            const bounds = Constants.WORLD_PARAMETERS[paramKey];
+            const paramName = paramKey.toLowerCase().replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+            const oldValue = this.globalParameters[paramName] || 0;
+            
+            // Calculate new value with bounds checking
+            let newValue = oldValue + change;
+            newValue = Math.max(bounds.min, Math.min(bounds.max, newValue));
+            
+            // Update the parameter
+            this.globalParameters[paramName] = newValue;
+            
+            // Record the change
+            this.recordWorldChange({
+                type: 'parameter_change',
+                parameter: parameter,
+                oldValue: oldValue,
+                newValue: newValue,
+                change: change,
+                reason: reason,
+                timestamp: new Date().toISOString()
+            });
+            
+            logger.info(`Updated ${parameter} from ${oldValue} to ${newValue} (change: ${change})`);
+            return newValue;
+            
+        } catch (error) {
+            const errorMsg = `Failed to update global parameter '${parameter}': ${error.message}`;
+            logger.error(errorMsg, { error, parameter, change, reason });
+            
+            // Re-throw with more context if it's not already an AppError
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(errorMsg, 500, false);
+        }
+    }
+    
+    /**
+     * Records a change to the world state in the history log.
+     * 
+     * @param {Object} change - The change to record
+     * @param {string} change.type - The type of change (e.g., 'parameter_change')
+     * @param {string} change.parameter - The parameter that was changed
+     * @param {*} change.oldValue - The value before the change
+     * @param {*} change.newValue - The value after the change
+     * @param {*} [change.change] - The delta of the change
+     * @param {string} [change.reason] - The reason for the change
+     * @param {string} [change.timestamp] - When the change occurred (ISO string)
+     * @throws {AppError} If the change object is invalid
+     */
+    recordWorldChange(change) {
+        try {
+            const requiredFields = ['type', 'parameter', 'oldValue', 'newValue'];
+            const missingFields = requiredFields.filter(field => !(field in change));
+            
+            if (missingFields.length > 0) {
+                const errorMsg = `Invalid change object. Missing required fields: ${missingFields.join(', ')}`;
+                logger.error(errorMsg, { change });
+                throw new AppError(errorMsg, 400);
+            }
+
+            this.history.worldChanges.push({
+                ...change,
+                timestamp: change.timestamp || new Date().toISOString()
+            });
+            
+            // Keep history size manageable
+            if (this.history.worldChanges.length > 1000) {
+                this.history.worldChanges = this.history.worldChanges.slice(-1000);
+            }
+            
+            logger.debug(`Recorded world change: ${change.type} for ${change.parameter}`);
+            
+        } catch (error) {
+            const errorMsg = `Failed to record world change: ${error.message}`;
+            logger.error(errorMsg, { error, change });
+            
+            if (!(error instanceof AppError)) {
+                throw new AppError(errorMsg, 500, false);
+            }
+            throw error;
+        }
+    }
+    
+    /**
+     * Gets a summary of the world state.
+     * 
+     * @returns {Object} A summary of the world state
+     */
+    getWorldSummary() {
+        return {
+            parameters: this.globalParameters,
+            time: { ...this.time },
+            stats: {
+                totalEvents: this.events.length,
+                totalWorldChanges: this.history.worldChanges.length,
+                totalPlayerActions: this.history.playerActions.length,
+                totalStoryEvents: this.history.storyEvents.length
+            }
+        };
+    }
+    
+    // Additional methods for time management, events, etc. would go here...
+    
+}
+
+module.exports = WorldState;

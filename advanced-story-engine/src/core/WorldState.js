@@ -1,13 +1,34 @@
-const { WORLD_PARAMETERS } = require('../utils/Constants');
+const Constants = require('../utils/Constants');
+const logger = require('../utils/logger');
+const { AppError } = require('../utils/errorHandler');
 
+/**
+ * Manages the global state of the game world, including parameters, temporal state,
+ * events, and historical records.
+ * 
+ * @class WorldState
+ * @example
+ * const worldState = new WorldState();
+ * worldState.updateGlobalParameter('GLOBAL_TENSION', 10, 'Player action');
+ */
 class WorldState {
+    /**
+     * Creates a new WorldState instance with default values.
+     * Initializes global parameters, temporal state, events, and history.
+     * 
+     * @constructor
+     * @throws {AppError} If there's an error initializing the world state
+     */
     constructor() {
-        this.globalParameters = {
-            tension: WORLD_PARAMETERS.GLOBAL_TENSION.default,
-            politicalStability: WORLD_PARAMETERS.POLITICAL_STABILITY.default,
-            economicState: WORLD_PARAMETERS.ECONOMIC_STATE.default,
-            magicalActivity: WORLD_PARAMETERS.MAGICAL_ACTIVITY.default
-        };
+        try {
+            logger.info('Initializing WorldState...');
+            // Initialize global parameters with default values
+            this.globalParameters = {};
+        Object.entries(Constants.WORLD_PARAMETERS).forEach(([key, value]) => {
+            // Convert key to camelCase for the internal object
+            const paramName = key.toLowerCase().replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+            this.globalParameters[paramName] = value.default;
+        });
         
         this.temporal = {
             timeOfDay: 'morning',
@@ -39,30 +60,75 @@ class WorldState {
         };
     }
     
+    /**
+     * Updates a global parameter by applying the specified change.
+     * The value will be clamped within the parameter's defined bounds.
+     * 
+     * @param {string} parameter - The name of the parameter to update (case-insensitive)
+     * @param {number} change - The amount to add to the current value
+     * @param {string} [reason=''] - The reason for the change (for history tracking)
+     * @returns {number} The new value of the parameter
+     * @throws {AppError} If the parameter is invalid or the update fails
+     * @example
+     * // Increase tension by 10
+     * worldState.updateGlobalParameter('GLOBAL_TENSION', 10, 'Player made a difficult choice');
+     */
     updateGlobalParameter(parameter, change, reason = '') {
+        try {
+            if (typeof parameter !== 'string' || parameter.trim() === '') {
+                throw new AppError('Parameter name must be a non-empty string', 400);
+            }
+
+            if (typeof change !== 'number' || isNaN(change)) {
+                throw new AppError('Change must be a valid number', 400);
+            }
+
+            logger.debug(`Updating global parameter: ${parameter} (change: ${change}, reason: ${reason})`);
+        
+        // First try exact match
         if (this.globalParameters.hasOwnProperty(parameter)) {
-            const oldValue = this.globalParameters[parameter];
-            const bounds = WORLD_PARAMETERS[parameter.toUpperCase()];
+            const paramKey = Object.entries(Constants.WORLD_PARAMETERS)
+                .find(([key, value]) => 
+                    key.toLowerCase() === parameter.toUpperCase() || 
+                    key.toLowerCase().replace(/_/g, '').toLowerCase() === parameter.toLowerCase()
+                )?.[0];
             
-            this.globalParameters[parameter] = Math.max(
+            if (!paramKey) {
+                const errorMsg = `Unknown global parameter: ${parameter}. Available parameters: ${Object.keys(Constants.WORLD_PARAMETERS).join(', ')}`;
+                logger.warn(errorMsg);
+                throw new AppError(errorMsg, 400);
+            }
+            
+            const bounds = Constants.WORLD_PARAMETERS[paramKey];
+            const paramName = paramKey.toLowerCase().replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+            
+            const oldValue = this.globalParameters[parameter];
+            const newValue = Math.max(
                 bounds.min,
                 Math.min(bounds.max, oldValue + change)
             );
             
-            this.recordWorldChange({
-                type: 'parameter_change',
-                parameter: parameter,
-                oldValue: oldValue,
-                newValue: this.globalParameters[parameter],
-                change: change,
-                reason: reason,
-                timestamp: new Date().toISOString()
-            });
+            console.log(`Updating ${parameter} (${paramName}) from ${oldValue} to ${newValue}`);
+            this.globalParameters[parameter] = newValue;
             
-            return this.globalParameters[parameter];
+            try {
+                this.recordWorldChange({
+                    type: 'parameter_change',
+                    parameter: parameter,
+                    oldValue: oldValue,
+                    newValue: newValue,
+                    change: change,
+                    reason: reason,
+                    timestamp: new Date().toISOString()
+                });
+                
+                logger.info(`Updated ${parameter} from ${oldValue} to ${newValue} (change: ${change})`);
+                return newValue;
+            }
+        } catch (error) {
+            logger.error(`Error in updateGlobalParameter: ${error.message}`, { error, parameter, change, reason });
+            throw error;
         }
-        
-        throw new Error(`Unknown global parameter: ${parameter}`);
     }
     
     advanceTime(amount = 1, unit = 'hour') {
@@ -248,16 +314,54 @@ class WorldState {
             }
         });
     }
-    
+
+    /**
+     * Records a change to the world state in the history log.
+     * 
+     * @param {Object} change - The change to record
+     * @param {string} change.type - The type of change (e.g., 'parameter_change')
+     * @param {string} change.parameter - The parameter that was changed
+     * @param {*} change.oldValue - The value before the change
+     * @param {*} change.newValue - The value after the change
+     * @param {*} [change.change] - The delta of the change
+     * @param {string} [change.reason] - The reason for the change
+     * @param {string} [change.timestamp] - When the change occurred (ISO string)
+     * @throws {AppError} If the change object is invalid
+     */
     recordWorldChange(change) {
-        this.history.worldChanges.push(change);
-        
-        // Keep history manageable
-        if (this.history.worldChanges.length > 100) {
-            this.history.worldChanges = this.history.worldChanges.slice(-100);
+        const requiredFields = ['type', 'parameter', 'oldValue', 'newValue'];
+        const missingFields = requiredFields.filter(field => !(field in change));
+
+        if (missingFields.length > 0) {
+            const errorMsg = `Invalid change object. Missing required fields: ${missingFields.join(', ')}`;
+            logger.error(errorMsg, { change });
+            throw new AppError(errorMsg, 400);
+        }
+
+        try {
+            this.history.worldChanges.push({
+                ...change,
+                timestamp: change.timestamp || new Date().toISOString()
+            });
+
+            // Keep history size manageable
+            if (this.history.worldChanges.length > 1000) {
+                this.history.worldChanges = this.history.worldChanges.slice(-1000);
+            }
+
+            logger.debug(`Recorded world change: ${change.type} for ${change.parameter}`);
+        } catch (error) {
+            const errorMsg = `Failed to record world change: ${error.message}`;
+            logger.error(errorMsg, { error, change });
+            throw new AppError(errorMsg, 500, false);
         }
     }
-    
+
+    /**
+     * Gets a summary of the world state.
+     * 
+     * @returns {Object} A summary of the world state
+     */
     getWorldSummary() {
         return {
             parameters: this.globalParameters,

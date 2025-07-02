@@ -1,0 +1,310 @@
+{
+  "player": {
+    "name": "Traveler",
+    "level": 1,
+    "health": 100,
+    "maxHealth": 100,
+    "experience": 0,
+    "reputation": {
+      "heroic": 0,
+      "villainous": 0,
+      "mysterious": 0,
+      "diplomatic": 0
+    },
+    "traits": [
+      "curious",
+      "determined"
+    ],
+    "skills": {
+      "combat": 10,
+      "diplomacy": 10,
+      "stealth": 10,
+      "knowledge": 10,
+      "magic": 10,
+      "survival": 10
+    },
+    "currentLocation": "village_square",
+    "mood": "neutral",
+    "goals": [
+      "explore_world"
+    ],
+    "secrets": [],
+    "choiceHistory": []
+  },
+  "entities": {
+    "npcs": {
+      "village_elder": {
+        "id": "village_elder",
+        "type": "npc",
+        "created": "2025-07-02T04:39:27.483Z",
+        "lastModified": "2025-07-02T04:39:27.494Z",
+        "metadata": {},
+        "name": "Elder Thane",
+        "displayName": "Elder Thane",
+        "occupation": "village_leader",
+        "age": 68,
+        "location": "village_square",
+        "traits": [
+          "wise",
+          "patient",
+          "respected",
+          "old"
+        ],
+        "backstory": "Long-serving elder who has guided the village through many crises",
+        "goals": [
+          "protect_village",
+          "maintain_peace"
+        ],
+        "secrets": [
+          "knows_ancient_prophecy"
+        ],
+        "mood": "neutral",
+        "importance": "high",
+        "trust": 50,
+        "fear": 10,
+        "respect": 50,
+        "love": 0,
+        "met": false,
+        "alive": true,
+        "health": 100,
+        "lastSeen": null,
+        "relationships": {}
+      }
+    },
+    "factions": {
+      "village_council": {
+        "id": "village_council",
+        "type": "political",
+        "created": "2025-07-02T04:39:27.494Z",
+        "lastModified": "2025-07-02T04:39:27.494Z",
+        "metadata": {},
+        "name": "Village Council",
+        "displayName": "Village Council",
+        "influence": 60,
+        "wealth": 40,
+        "militaryPower": 20,
+        "attitude": "neutral",
+        "territory": [
+          "village_square"
+        ],
+        "goals": [
+          "maintain_order",
+          "protect_citizens"
+        ],
+        "allies": [],
+        "enemies": [],
+        "secrets": [],
+        "leadership": [
+          "village_elder"
+        ],
+        "foundedYear": "unknown",
+        "reputation": "respected"
+      }
+    },
+    "locations": {
+      "village_square": {
+        "id": "village_square",
+        "type": "settlement",
+        "created": "2025-07-02T04:39:27.494Z",
+        "lastModified": "2025-07-02T04:39:27.494Z",
+        "metadata": {},
+        "name": "Village Square",
+        "displayName": "Village Square",
+        "visited": true,
+        "safety": 90,
+        "description": "A peaceful cobblestone square with an ancient well at its center",
+        "atmosphere": "busy",
+        "connectedTo": [],
+        "controlledBy": "village_council",
+        "events": [],
+        "secrets": [
+          "hidden_passage_under_well"
+        ],
+        "resources": [
+          "fresh_water",
+          "meeting_place"
+        ],
+        "population": 50,
+        "wealth": "moderate"
+      }
+    },
+    "items": {
+      "rusty_sword": {
+        "id": "rusty_sword",
+        "type": "weapon",
+        "created": "2025-07-02T04:39:27.494Z",
+        "lastModified": "2025-07-02T04:39:27.494Z",
+        "metadata": {},
+        "name": "Rusty Iron Sword",
+        "displayName": "Rusty Iron Sword",
+        "subtype": "sword",
+        "value": 15,
+        "weight": 3,
+        "durability": 40,
+        "description": "An old sword showing signs of age but still functional",
+        "enchantments": [],
+        "history": "unknown",
+        "location": "player_inventory",
+        "rarity": "common",
+        "properties": []
+      }
+    }
+  },
+  "relationships": {
+    "playerStandings": {
+      "village_council": {
+        "value": 10,
+        "history": [],
+        "lastChange": null,
+        "established": "2025-07-02T04:39:27.494Z"
+      }
+    },
+    "entityRelationships": {
+      "relationships": {},
+      "playerStandings": {
+        "village_council": {
+          "value": 10,
+          "history": [],
+          "lastChange": null,
+          "established": "2025-07-02T04:39:27.494Z"
+        }
+      },
+      "relationshipHistory": [],
+      "timestamp": "2025-07-02T04:39:27.501Z"
+    }
+  },
+  "worldState": {
+    "globalParameters": {
+      "tension": 30,
+      "politicalStability": 80,
+      "economicState": 50,
+      "magicalActivity": 20
+    },
+    "temporal": {
+      "timeOfDay": "morning",
+      "season": "spring",
+      "weather": "clear",
+      "day": 1,
+      "month": "firstmonth",
+      "year": 1000
+    },
+    "events": {
+      "current": [],
+      "completed": [],
+      "failed": [],
+      "scheduled": []
+    },
+    "information": {
+      "rumorMill": [],
+      "news": [],
+      "secrets": [],
+      "prophecies": []
+    },
+    "history": {
+      "majorEvents": [],
+      "decisiveChoices": [],
+      "worldChanges": []
+    }
+  },
+  "storyContext": {
+    "currentScene": "introduction",
+    "sceneHistory": [],
+    "tension": 30,
+    "mystery": 50,
+    "romance": 0,
+    "comedy": 20,
+    "horror": 5,
+    "lastChoiceConsequences": [],
+    "narrativeArcs": [
+      "mysterious_arrival"
+    ],
+    "plottedEvents": [],
+    "characterDevelopment": {}
+  },
+  "meta": {
+    "version": "2.0",
+    "sessionId": 1751431167482,
+    "totalPlayTime": 0,
+    "choiceCount": 0,
+    "lastSave": "2025-07-02T04:39:27.502Z"
+  },
+  "analysis": {
+    "worldStateAnalysis": {
+      "stability": "stable",
+      "tension": "low",
+      "economicHealth": "good",
+      "magicalClimate": "normal",
+      "trends": [],
+      "concerns": [],
+      "opportunities": []
+    },
+    "playerProfile": {
+      "dominantReputation": {
+        "type": "neutral",
+        "value": 0
+      },
+      "strongestSkills": [
+        {
+          "skill": "combat",
+          "level": 10
+        },
+        {
+          "skill": "diplomacy",
+          "level": 10
+        },
+        {
+          "skill": "stealth",
+          "level": 10
+        }
+      ],
+      "recentActivity": {
+        "choicesLastSession": 0,
+        "locationsVisited": 0,
+        "majorDecisions": []
+      },
+      "relationships": {
+        "allies": [],
+        "enemies": [],
+        "neutral": [
+          {
+            "id": "village_council",
+            "name": "Village Council",
+            "standing": 10
+          }
+        ]
+      }
+    },
+    "entityStatistics": {
+      "npcs": {
+        "total": 1,
+        "met": 0,
+        "alive": 1
+      },
+      "factions": {
+        "total": 1,
+        "allied": 0,
+        "hostile": 0
+      },
+      "locations": {
+        "total": 1,
+        "visited": 1
+      },
+      "items": {
+        "total": 1,
+        "inInventory": 1
+      }
+    },
+    "relationshipNetworks": {
+      "village_elder": {
+        "directConnections": 0,
+        "allies": 0,
+        "enemies": 0,
+        "neutral": 0,
+        "averageStrength": 0,
+        "mostTrusted": null,
+        "mostFeared": null,
+        "networkInfluence": 0
+      }
+    }
+  }
+}

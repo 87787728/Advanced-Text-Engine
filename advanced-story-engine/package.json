@@ -6,13 +6,14 @@
   "scripts": {
     "start": "node src/main.js",
     "dev": "nodemon src/main.js",
+    "validate": "node scripts/validate-installation.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "docs": "jsdoc -d docs/ src/",
-    "validate": "node scripts/validate-installation.js"
+    "health-check": "node scripts/health-check.js"
   },
   "keywords": [
     "storytelling",
@@ -25,14 +26,43 @@
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "date-fns": "^2.30.0",
     "dotenv": "^17.0.1",
-    "readline-sync": "^1.4.10"
+    "readline-sync": "^1.4.10",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setupTests.js"
+    ],
+    "moduleNameMapper": {
+      "^@google/generative-ai$": "<rootDir>/tests/__mocks__/@google/generative-ai.js"
+    },
+    "testTimeout": 10000
   },
   "devDependencies": {
-    "eslint": "^8.0.0",
-    "jest": "^29.0.0",
-    "jsdoc": "^4.0.0",
-    "nodemon": "^3.1.10"
+    "docdash": "^2.0.0",
+    "eslint": "^8.56.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-jsdoc": "^48.0.6",
+    "eslint-plugin-n": "^16.6.0",
+    "eslint-plugin-promise": "^6.1.1",
+    "jest": "^29.7.0",
+    "jsdoc": "^4.0.2",
+    "nodemon": "^3.0.1"
   },
   "engines": {
     "node": ">=16.0.0"

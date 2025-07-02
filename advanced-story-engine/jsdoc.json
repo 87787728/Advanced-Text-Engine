@@ -1,0 +1,30 @@
+{
+  "source": {
+    "include": ["src"],
+    "includePattern": "\\.(js|jsx)$"
+  },
+  "plugins": ["plugins/markdown"],
+  "opts": {
+    "template": "node_modules/docdash",
+    "encoding": "utf8",
+    "destination": "./docs/",
+    "recurse": true,
+    "verbose": true
+  },
+  "docdash": {
+    "static": true,
+    "sort": true,
+    "search": true,
+    "collapse": true,
+    "sectionOrder": [
+      "Tutorials",
+      "Classes",
+      "Modules",
+      "Externals",
+      "Events",
+      "Namespaces",
+      "Mixins",
+      "Interfaces"
+    ]
+  }
+}
