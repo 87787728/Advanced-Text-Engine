@@ -1,0 +1,22 @@
+{
+  "name": "advanced-story-engine",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "description": ""
+}
