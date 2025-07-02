@@ -1,22 +1,47 @@
 {
   "name": "advanced-story-engine",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "A sophisticated dynamic storytelling engine with AI-powered procedural world building",
+  "main": "src/main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/main.js",
+    "dev": "nodemon src/main.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "docs": "jsdoc -d docs/ src/",
+    "validate": "node scripts/validate-installation.js"
   },
-  "keywords": [],
+  "keywords": [
+    "storytelling",
+    "ai",
+    "game",
+    "interactive",
+    "narrative"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1"
+    "@google/generative-ai": "^0.24.1",
+    "dotenv": "^17.0.1",
+    "readline-sync": "^1.4.10"
   },
   "devDependencies": {
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "jsdoc": "^4.0.0",
     "nodemon": "^3.1.10"
   },
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
+  "engines": {
+    "node": ">=16.0.0"
   },
-  "description": ""
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/87787728/Advanced-Text-Engine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/87787728/Advanced-Text-Engine/issues"
+  }
 }

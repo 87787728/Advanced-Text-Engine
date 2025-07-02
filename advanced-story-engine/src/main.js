@@ -1,3 +1,4 @@
+require('dotenv').config();
 const readline = require('readline');
 const StoryEngine = require('./core/StoryEngine');
 
@@ -24,18 +25,19 @@ class GameInterface {
     }
     
     async initialize() {
-        console.log("🎭 Advanced Dynamic Story Engine v2.0");
-        console.log("🌟 A sophisticated world that grows and evolves with every choice!");
-        console.log("═".repeat(70));
+        console.log(`🎭 Advanced Dynamic Story Engine v2.0`);
+        console.log(`🌟 A sophisticated world that grows and evolves with every choice!`);
+        console.log('════════════════════════════════════════════════════════════════════════════════════');
         
-        const apiKey = await this.askQuestion("🔑 Enter your Gemini API key: ");
+        // Get API key from environment variable or prompt
+        let apiKey = process.env.GEMINI_API_KEY;
         
-        if (!apiKey.trim()) {
-            console.log("❌ API key required to run the advanced story engine!");
-            process.exit(1);
+        if (!apiKey) {
+            console.log('ℹ️  No API key found in environment variables.');
+            apiKey = await this.askQuestion('🔑 Enter your Gemini API key: ');
         }
         
-        console.log("\n⚡ Initializing advanced systems...");
+        // Initialize the story engine with the API key
         this.engine = new StoryEngine(apiKey);
         
         console.log("✅ All systems operational!");
@@ -497,6 +499,12 @@ async function main() {
         process.exit(1);
     }
 }
+
+// Start the game
+main().catch(error => {
+    console.error("Unhandled error in main:", error);
+    process.exit(1);
+});
 
 // Enhanced shutdown handling
 process.on('SIGINT', () => {
